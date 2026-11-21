@@ -1,0 +1,448 @@
+<title>Sit Window</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-width column. Best sits on top, the 7-day grid, then the sighting log and the scoring notes. */
+:root{
+  --bg:#eef0ea; --surface:#f8f9f5; --line:#d5d9cd; --fg:#1d2a22; --muted:#5d6a60;
+  --accent:#b8661c; --accent-ink:#fff;
+  --go:#2f7d4a; --good:#6a9a3c; --meh:#b59a2a; --skip:#9a8f84; --bad:#b23b2e;
+  --chip:#e3e7dc;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141b17; --surface:#1c2620; --line:#2d3a31; --fg:#e4e9e2; --muted:#9aa89d;
+  --accent:#e08a3c; --accent-ink:#1a1206;
+  --go:#4fb071; --good:#8dbb5b; --meh:#d4b84a; --skip:#7e8a80; --bad:#e0645a;
+  --chip:#26332a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141b17; --surface:#1c2620; --line:#2d3a31; --fg:#e4e9e2; --muted:#9aa89d;
+  --accent:#e08a3c; --accent-ink:#1a1206;
+  --go:#4fb071; --good:#8dbb5b; --meh:#d4b84a; --skip:#7e8a80; --bad:#e0645a;
+  --chip:#26332a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:640px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:2.3rem;line-height:1}
+h2{font-size:1.45rem;text-transform:uppercase;letter-spacing:.06em}
+.sub{color:var(--muted);font-size:.9rem;margin-top:4px}
+.banner{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:.88rem;color:var(--muted)}
+.banner b{color:var(--fg)}
+.banner.sample{border-color:var(--meh)}
+section{display:flex;flex-direction:column;gap:12px}
+.picks{display:grid;gap:10px}
+.pick{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center}
+.score{font-family:var(--display);font-weight:700;font-size:2.4rem;line-height:1;grid-row:span 2;min-width:3ch;text-align:center;font-variant-numeric:tabular-nums}
+.pick .when{font-weight:600}
+.pick .times{color:var(--muted);font-size:.88rem;font-variant-numeric:tabular-nums}
+.pick .chips{grid-column:1/-1;margin-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--chip);border-radius:999px;padding:3px 9px;font-size:.78rem}
+.chip::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--skip)}
+.chip.pos::before{background:var(--go)}
+.chip.neg::before{background:var(--bad)}
+.grid{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.row{display:grid;grid-template-columns:5.2rem repeat(3,1fr);border-top:1px solid var(--line);align-items:stretch}
+.row:first-child{border-top:0}
+.row.head{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.row.head div{padding:8px 6px;text-align:center}
+.row.head div:first-child{text-align:left;padding-left:12px}
+.day{padding:10px 0 10px 12px;font-weight:600;font-size:.9rem;line-height:1.2}
+.day small{display:block;color:var(--muted);font-weight:400;font-size:.75rem}
+.cell{appearance:none;border:0;border-left:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;min-height:56px}
+.cell:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cell[aria-pressed="true"]{background:var(--chip)}
+.cell .n{font-family:var(--display);font-weight:700;font-size:1.35rem;line-height:1;font-variant-numeric:tabular-nums}
+.cell .l{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.cell.past{opacity:.4}
+.cell.none{cursor:default;color:var(--muted);font-size:.75rem}
+.c-go{color:var(--go)}.c-good{color:var(--good)}.c-meh{color:var(--meh)}.c-skip{color:var(--skip)}.c-bad{color:var(--bad)}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.detail table{width:100%;border-collapse:collapse;font-size:.86rem}
+.detail td{padding:6px 0;border-top:1px solid var(--line);vertical-align:top}
+.detail td.pts{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;padding-left:10px}
+.ev{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block}
+.wx{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.84rem;color:var(--muted);font-variant-numeric:tabular-nums}
+form{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);min-width:0}
+input,select,textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0;text-transform:none;letter-spacing:0}
+.full{grid-column:1/-1}
+.btn{appearance:none;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;padding:11px 14px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);padding:4px 10px;font-size:.8rem;font-weight:500}
+.log{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.entry{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 12px;border-top:1px solid var(--line);font-size:.88rem}
+.entry:first-child{border-top:0}
+.entry .t{font-weight:600;font-variant-numeric:tabular-nums}
+.entry .m{color:var(--muted);font-size:.8rem;grid-column:1}
+.entry .btn{grid-row:1/span 2;grid-column:2;align-self:center}
+.empty{padding:14px;color:var(--muted);font-size:.88rem}
+.note{color:var(--muted);font-size:.8rem}
+.backup{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.btns{display:flex;gap:6px}
+.filebtn{display:inline-flex;flex-direction:row;text-transform:none;letter-spacing:0;font-size:.8rem;color:var(--muted);cursor:pointer}
+.filebtn input{position:absolute;width:1px;height:1px;opacity:0}
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+summary{cursor:pointer;font-weight:600}
+details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;gap:6px;font-size:.88rem}
+.ev-strong{color:var(--go)}.ev-moderate{color:var(--meh)}.ev-weak{color:var(--skip)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Sit Window</h1>
+    <div class="sub">Backyard blind · West Milford, NJ · bow</div>
+  </header>
+
+  <div id="source" class="banner">Loading forecast…</div>
+
+  <section>
+    <h2>Best 3 sits this week</h2>
+    <div id="picks" class="picks"></div>
+    <div class="note">At most one sit per day, so you don't burn out your own yard. Sits with a north wind never make the list.</div>
+  </section>
+
+  <section>
+    <h2>Next 7 days</h2>
+    <div id="grid" class="grid" role="table" aria-label="Sit scores by day"></div>
+    <div id="detail" class="detail" hidden></div>
+  </section>
+
+  <section>
+    <h2>Log a sighting</h2>
+    <form id="logform">
+      <label class="full">When<input id="f-at" type="datetime-local" required></label>
+      <label>Seen by<select id="f-src"><option value="blind">Me, from the blind</option><option value="camera">Trail camera</option></select></label>
+      <label>Does<input id="f-does" type="number" min="0" max="50" value="0" inputmode="numeric"></label>
+      <label>Bucks<input id="f-bucks" type="number" min="0" max="50" value="0" inputmode="numeric"></label>
+      <label>Notes<input id="f-notes" type="text" maxlength="140" placeholder="8-pointer, came from the north edge"></label>
+      <button class="btn full" type="submit">Save sighting</button>
+    </form>
+    <div class="backup"><span id="store" class="note"></span>
+      <span id="backup-btns" class="btns" hidden><button id="b-export" class="btn ghost" type="button">Export backup</button><label class="btn ghost filebtn">Import<input id="b-import" type="file" accept=".json,application/json"></label></span></div>
+    <div id="log" class="log"></div>
+  </section>
+
+  <details>
+    <summary>How the score works</summary>
+    <ul>
+      <li>Every sit starts at 50. Each factor adds or subtracts points, and the detail view shows the math.</li>
+      <li><b>Time of day</b> <span class="ev-strong">strong evidence</span>. Dawn and dusk beat everything else. Midday sits only show up during the rut, at a penalty.</li>
+      <li><b>Rut timing</b> <span class="ev-strong">strong evidence</span>. In a Mississippi study of 48 collared bucks, they moved about 140 more yards per hour at peak rut. The North Jersey dates here are an estimate: seeking Oct 28 to Nov 9, peak Nov 10 to 22, tail to Dec 5, second rut Dec 6 to 18.</li>
+      <li><b>Wind direction</b> (your blind) <span class="ev-strong">strong</span>. South is best, SE and SW are fine, E and W are iffy, and any north wind is flagged as a bad sit.</li>
+      <li><b>Temperature drop, wind speed</b> <span class="ev-moderate">moderate evidence</span>. Colder than recent days means more daytime movement. High wind means less.</li>
+      <li><b>Barometric pressure and rain</b> <span class="ev-weak">weak to moderate evidence</span>. Effects show up mostly at the extremes, like pressure rebounding after a front or rain that just stopped.</li>
+      <li><b>Your sightings</b>. Daylight sightings in the last 45 days add up to 8 points to sits at the same time of day. Camera photos at night don't count, because you can't hunt at 2 AM.</li>
+      <li><b>Moon phase</b> <span class="ev-weak">no measurable effect</span>. It's shown for curiosity and worth 0 points. A 48-buck GPS study found essentially no effect from phase or position.</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+(function(){
+"use strict";
+var LAT=41.13, LON=-74.37, TZ="America/New_York";
+var DAY=86400000, HOUR=3600000, MIN=60000;
+var DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var COMPASS=["N","NE","E","SE","S","SW","W","NW"];
+
+// All times are "naive local" ms: New York wall-clock time stored as if it were UTC.
+function parseNaive(s){var m=s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);return Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5]);}
+function pad(n){return (n<10?"0":"")+n;}
+function iso(ms){var d=new Date(ms);return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())+"T"+pad(d.getUTCHours())+":"+pad(d.getUTCMinutes());}
+function dayKey(ms){return iso(ms).slice(0,10);}
+function clock(ms){var d=new Date(ms),h=d.getUTCHours(),m=d.getUTCMinutes();return ((h+11)%12+1)+":"+pad(m)+(h<12?" AM":" PM");}
+function nyOffsetMin(realMs){
+  var p={};new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).formatToParts(new Date(realMs)).forEach(function(x){p[x.type]=x.value;});
+  return (Date.UTC(+p.year,p.month-1,+p.day,+p.hour%24,+p.minute)-Math.floor(realMs/MIN)*MIN)/MIN;
+}
+function nowNaive(){var r=Date.now();return r+nyOffsetMin(r)*MIN;}
+
+// NOAA sunrise/sunset, returns naive-local ms for the given local date (midnight naive ms).
+function sunTimes(dayMs){
+  var d=new Date(dayMs), y=d.getUTCFullYear(), start=Date.UTC(y,0,1);
+  var N=Math.round((dayMs-start)/DAY)+1, rad=Math.PI/180;
+  var g=2*Math.PI/365*(N-1);
+  var eq=229.18*(0.000075+0.001868*Math.cos(g)-0.032077*Math.sin(g)-0.014615*Math.cos(2*g)-0.040849*Math.sin(2*g));
+  var dec=0.006918-0.399912*Math.cos(g)+0.070257*Math.sin(g)-0.006758*Math.cos(2*g)+0.000907*Math.sin(2*g)-0.002697*Math.cos(3*g)+0.00148*Math.sin(3*g);
+  var ha=Math.acos(Math.cos(90.833*rad)/(Math.cos(LAT*rad)*Math.cos(dec))-Math.tan(LAT*rad)*Math.tan(dec))/rad;
+  var off=nyOffsetMin(dayMs+12*HOUR+5*HOUR);
+  var rise=720-4*(LON+ha)-eq+off, set=720-4*(LON-ha)-eq+off;
+  return {rise:dayMs+rise*MIN, set:dayMs+set*MIN};
+}
+function moonPhase(ms){
+  var age=((ms-Date.UTC(2000,0,6,18,14))/DAY)%29.530588; if(age<0)age+=29.530588;
+  var f=age/29.530588;
+  var names=["New moon","Waxing crescent","First quarter","Waxing gibbous","Full moon","Waning gibbous","Last quarter","Waning crescent"];
+  return names[Math.floor(f*8+0.5)%8];
+}
+
+// ---------- weather ----------
+function liveWeather(){
+  var url="https://api.open-meteo.com/v1/forecast?latitude="+LAT+"&longitude="+LON+
+    "&hourly=temperature_2m,pressure_msl,wind_speed_10m,wind_direction_10m,precipitation,cloud_cover"+
+    "&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=mm"+
+    "&timezone="+encodeURIComponent(TZ)+"&past_days=3&forecast_days=8";
+  return fetch(url).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(j){
+    var h=j.hourly, sun={};
+    j.daily.time.forEach(function(t,i){sun[t]={rise:parseNaive(j.daily.sunrise[i]),set:parseNaive(j.daily.sunset[i])};});
+    return {live:true, t:h.time.map(parseNaive), temp:h.temperature_2m, pres:h.pressure_msl, ws:h.wind_speed_10m, wd:h.wind_direction_10m, rain:h.precipitation, cloud:h.cloud_cover, sun:sun};
+  });
+}
+function sampleWeather(){
+  // A made-up but realistic week: warm southerly flow, a cold front with rain, then cold NW wind turning back south.
+  var today=Math.floor(nowNaive()/DAY)*DAY, start=today-3*DAY;
+  var mean=[44,46,48,50,52,39,33,35,40,44,46], pres=[1018,1016,1014,1011,1005,1013,1022,1025,1021,1017,1015],
+      dir=[200,190,185,195,215,310,320,290,200,175,180], spd=[7,6,8,9,13,16,11,6,7,8,6];
+  var o={live:false,t:[],temp:[],pres:[],ws:[],wd:[],rain:[],cloud:[],sun:{}};
+  for(var k=0;k<11*24;k++){
+    var ms=start+k*HOUR, d=Math.floor(k/24), hr=k%24, fr=hr/24;
+    var nd=Math.min(d+1,10), lerp=function(a){return a[d]+(a[nd]-a[d])*fr;};
+    var diurnal=-Math.cos((hr-3)/24*2*Math.PI)*9;
+    o.t.push(ms); o.temp.push(Math.round((lerp(mean)+diurnal+Math.sin(k*1.7)*1.2)*10)/10);
+    o.pres.push(Math.round(lerp(pres)*10)/10);
+    o.wd.push(Math.round((lerp(dir)+Math.sin(k*0.9)*12+360)%360));
+    o.ws.push(Math.max(0,Math.round((lerp(spd)*(0.75+0.5*Math.sin((hr-6)/24*Math.PI)))*10)/10));
+    var r=0; if(d===4&&hr>=13) r=1.2+Math.abs(Math.sin(k))*2.4; if(d===5&&hr<4) r=0.8;
+    o.rain.push(Math.round(r*10)/10); o.cloud.push(r>0?100:40);
+  }
+  for(var dd=0;dd<11;dd++){var dm=start+dd*DAY;o.sun[dayKey(dm)]=sunTimes(dm);}
+  return o;
+}
+
+// ---------- scoring ----------
+function rutPhase(ms){
+  var d=new Date(ms), md=(d.getUTCMonth()+1)*100+d.getUTCDate();
+  if(md>=1028&&md<=1109) return {pts:8,label:"Seeking phase of the rut"};
+  if(md>=1110&&md<=1122) return {pts:12,label:"Peak rut (North Jersey estimate)"};
+  if(md>=1123&&md<=1205) return {pts:4,label:"Tail end of the rut"};
+  if(md>=1206&&md<=1218) return {pts:5,label:"Second rut window"};
+  return {pts:0,label:"Outside the rut"};
+}
+function idxAt(W,ms){var i=Math.round((ms-W.t[0])/HOUR);return (i>=0&&i<W.t.length)?i:-1;}
+function hoursIn(W,a,b){var r=[];for(var ms=Math.floor(a/HOUR)*HOUR;ms<b;ms+=HOUR){var i=idxAt(W,ms);if(i>=0)r.push(i);}return r;}
+function avg(W,key,ix){if(!ix.length)return null;var s=0;ix.forEach(function(i){s+=W[key][i];});return s/ix.length;}
+function sum(W,key,ix){var s=0;ix.forEach(function(i){s+=W[key][i];});return s;}
+function meanDir(W,ix){var x=0,y=0;ix.forEach(function(i){var r=W.wd[i]*Math.PI/180;x+=Math.sin(r);y+=Math.cos(r);});var d=Math.atan2(x,y)*180/Math.PI;return (d+360)%360;}
+function compass(d){return COMPASS[Math.round(d/45)%8];}
+
+function scoreSit(W,sit,sightings){
+  var f=[], ix=hoursIn(W,sit.start,sit.end), bad=false;
+  if(!ix.length) return null;
+  if(sit.kind==="mid") f.push({pts:-10,text:"Midday: lower odds, but rutting bucks do roam",ev:"strong"});
+  else f.push({pts:0,text:(sit.kind==="am"?"Dawn":"Dusk")+": peak movement time",ev:"strong"});
+  var rp=rutPhase(sit.start); if(rp.pts) f.push({pts:rp.pts,text:rp.label,ev:"strong"});
+
+  var wd=meanDir(W,ix), c=compass(wd), ws=avg(W,"ws",ix);
+  if(c==="S") f.push({pts:8,text:"South wind, ideal for your blind",ev:"strong"});
+  else if(c==="SE"||c==="SW") f.push({pts:4,text:c+" wind, workable for your blind",ev:"strong"});
+  else if(c==="E"||c==="W") f.push({pts:-6,text:c+" wind, iffy for your blind",ev:"strong"});
+  else {bad=true; f.push({pts:-25,text:c+" wind blows your scent toward the deer",ev:"strong"});}
+
+  if(ws<=10) f.push({pts:3,text:"Light wind ("+Math.round(ws)+" mph)",ev:"moderate"});
+  else if(ws<=15) f.push({pts:-3,text:"Breezy ("+Math.round(ws)+" mph)",ev:"moderate"});
+  else if(ws<=20) f.push({pts:-8,text:"Windy ("+Math.round(ws)+" mph), deer bed down",ev:"moderate"});
+  else f.push({pts:-15,text:"Very windy ("+Math.round(ws)+" mph)",ev:"moderate"});
+
+  var t=avg(W,"temp",ix), prior=[];
+  [1,2,3].forEach(function(n){var p=avg(W,"temp",hoursIn(W,sit.start-n*DAY,sit.end-n*DAY));if(p!==null)prior.push(p);});
+  if(prior.length){
+    var pm=prior.reduce(function(a,b){return a+b;},0)/prior.length, dt=t-pm;
+    if(dt<=-8) f.push({pts:10,text:Math.round(-dt)+"°F colder than recent days",ev:"moderate"});
+    else if(dt<=-4) f.push({pts:5,text:Math.round(-dt)+"°F colder than recent days",ev:"moderate"});
+    else if(dt>=8) f.push({pts:-8,text:Math.round(dt)+"°F warmer than recent days",ev:"moderate"});
+  }
+  if(t>=60) f.push({pts:-8,text:"Warm for the season ("+Math.round(t)+"°F)",ev:"moderate"});
+
+  var i0=ix[0], i4=idxAt(W,W.t[i0]-4*HOUR);
+  if(i4>=0){
+    var d4=W.pres[i0]-W.pres[i4], lo=Infinity;
+    for(var k=Math.max(0,i0-24);k<=i0;k++) lo=Math.min(lo,W.pres[k]);
+    if(W.pres[i0]-lo>=5&&d4>=0) f.push({pts:8,text:"Pressure rebounding after a front (+"+(W.pres[i0]-lo).toFixed(0)+" hPa in 24 h)",ev:"weak"});
+    else if(d4<=-2.5) f.push({pts:3,text:"Pressure falling fast ahead of weather",ev:"weak"});
+  }
+
+  var rain=sum(W,"rain",ix), before=sum(W,"rain",hoursIn(W,sit.start-6*HOUR,sit.start));
+  if(rain>5) f.push({pts:-15,text:"Heavy rain during the sit",ev:"moderate"});
+  else if(rain>=1) f.push({pts:-6,text:"Steady rain during the sit",ev:"moderate"});
+  else if(before>=1&&rain<0.2) f.push({pts:6,text:"Rain just ended",ev:"weak"});
+
+  var n=0,b=0, sStart=sit.start%DAY-30*MIN, sEnd=sit.end%DAY+30*MIN;
+  sightings.forEach(function(s){
+    var ms=parseNaive(s.at); if(sit.start-ms>45*DAY||ms>sit.start) return;
+    var sun=W.sun[dayKey(ms)]||sunTimes(Math.floor(ms/DAY)*DAY);
+    if(ms<sun.rise-30*MIN||ms>sun.set+30*MIN) return;
+    var tod=ms%DAY; if(tod>=sStart&&tod<=sEnd){n++;b+=(+s.bucks||0);}
+  });
+  if(n) f.push({pts:Math.min(8,3*n+b),text:"You logged deer at this time of day ("+n+" sighting"+(n>1?"s":"")+(b?", "+b+" buck"+(b>1?"s":""):"")+")",ev:"your log"});
+
+  var total=Math.max(0,Math.min(100,50+f.reduce(function(a,x){return a+x.pts;},0)));
+  return {score:Math.round(total),bad:bad,factors:f,wx:{temp:t,ws:ws,dir:c,rain:rain,pres:W.pres[i0]},moon:moonPhase(sit.start)};
+}
+function rating(r){
+  if(r.bad) return {cls:"c-bad",label:"Bad wind"};
+  if(r.score>=75) return {cls:"c-go",label:"Go"};
+  if(r.score>=60) return {cls:"c-good",label:"Good"};
+  if(r.score>=45) return {cls:"c-meh",label:"Meh"};
+  return {cls:"c-skip",label:"Skip"};
+}
+function buildSits(W){
+  var today=Math.floor(nowNaive()/DAY)*DAY, days=[];
+  for(var d=0;d<7;d++){
+    var dm=today+d*DAY, sun=W.sun[dayKey(dm)]||sunTimes(dm), rp=rutPhase(dm);
+    var sits={am:{kind:"am",start:sun.rise-30*MIN,end:sun.rise+150*MIN},
+              mid:(rp.pts>=4)?{kind:"mid",start:dm+11*HOUR,end:dm+14*HOUR}:null,
+              pm:{kind:"pm",start:sun.set-150*MIN,end:sun.set+30*MIN}};
+    days.push({day:dm,sun:sun,sits:sits});
+  }
+  return days;
+}
+
+// ---------- state + render ----------
+var W=null, sightings=[], selected=null, now=nowNaive();
+var $=function(id){return document.getElementById(id);};
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+function dayName(ms,short){var d=new Date(ms);var t=Math.floor(now/DAY)*DAY;var lbl=ms===t?"Today":ms===t+DAY?"Tomorrow":DOW[d.getUTCDay()];return short?lbl:lbl+", "+MON[d.getUTCMonth()]+" "+d.getUTCDate();}
+var KIND={am:"Morning",mid:"Midday",pm:"Evening"};
+
+function render(){
+  if(!W) return;
+  now=nowNaive();
+  var days=buildSits(W), all=[];
+  days.forEach(function(D){["am","mid","pm"].forEach(function(k){var s=D.sits[k];if(!s)return;s.res=scoreSit(W,s,sightings);s.day=D.day;if(s.res)all.push(s);});});
+
+  // best 3: future, not bad wind, one per day
+  var cand=all.filter(function(s){return s.start+30*MIN>now&&!s.res.bad;}).sort(function(a,b){return b.res.score-a.res.score;});
+  var used={}, picks=[];
+  cand.forEach(function(s){if(picks.length<3&&!used[s.day]){used[s.day]=1;picks.push(s);}});
+  picks.sort(function(a,b){return a.start-b.start;});
+  var P=$("picks"); P.textContent="";
+  if(!picks.length) P.appendChild(el("div","empty","No workable sits in the next 7 days. North wind all week. Clean your bow."));
+  picks.forEach(function(s){
+    var r=rating(s.res), card=el("div","pick");
+    var sc=el("div","score "+r.cls,String(s.res.score)); card.appendChild(sc);
+    card.appendChild(el("div","when",dayName(s.day)+" · "+KIND[s.kind]));
+    card.appendChild(el("div","times",clock(s.start)+" to "+clock(s.end)+" · "+Math.round(s.res.wx.temp)+"°F, "+s.res.wx.dir+" "+Math.round(s.res.wx.ws)+" mph"));
+    var ch=el("div","chips");
+    s.res.factors.filter(function(x){return x.pts!==0;}).sort(function(a,b){return Math.abs(b.pts)-Math.abs(a.pts);}).slice(0,4).forEach(function(x){ch.appendChild(el("span","chip "+(x.pts>0?"pos":"neg"),x.text));});
+    card.appendChild(ch); P.appendChild(card);
+  });
+
+  var G=$("grid"); G.textContent="";
+  var head=el("div","row head");head.setAttribute("role","row");["Day","Morning","Midday","Evening"].forEach(function(h){head.appendChild(el("div",null,h));});G.appendChild(head);
+  days.forEach(function(D){
+    var row=el("div","row");row.setAttribute("role","row");
+    var dc=el("div","day",dayName(D.day,true));dc.appendChild(el("small",null,MON[new Date(D.day).getUTCMonth()]+" "+new Date(D.day).getUTCDate()));row.appendChild(dc);
+    ["am","mid","pm"].forEach(function(k){
+      var s=D.sits[k];
+      if(!s||!s.res){var n=el("div","cell none",s?"no data":"—");row.appendChild(n);return;}
+      var r=rating(s.res), b=el("button","cell"+(s.end<now?" past":""));
+      b.type="button"; var id=dayKey(D.day)+k; b.setAttribute("aria-pressed",String(selected===id));
+      b.setAttribute("aria-label",dayName(D.day)+" "+KIND[k]+": score "+s.res.score+", "+r.label);
+      b.appendChild(el("span","n "+r.cls,String(s.res.score))); b.appendChild(el("span","l",r.label));
+      b.addEventListener("click",function(){selected=(selected===id)?null:id;render();});
+      row.appendChild(b);
+      if(selected===id) showDetail(D,s);
+    });
+    G.appendChild(row);
+  });
+  if(!selected) $("detail").hidden=true;
+}
+function showDetail(D,s){
+  var box=$("detail"); box.textContent=""; box.hidden=false;
+  var r=rating(s.res);
+  var h=el("div",null); var t=el("strong",null,dayName(D.day)+" · "+KIND[s.kind]+" · ");
+  h.appendChild(t); h.appendChild(el("strong",r.cls,s.res.score+" ("+r.label+")")); box.appendChild(h);
+  box.appendChild(el("div","wx",clock(s.start)+" to "+clock(s.end)));
+  var wx=el("div","wx"); [Math.round(s.res.wx.temp)+"°F", s.res.wx.dir+" "+Math.round(s.res.wx.ws)+" mph", s.res.wx.pres.toFixed(0)+" hPa", s.res.wx.rain.toFixed(1)+" mm rain", "Sunrise "+clock(D.sun.rise), "Sunset "+clock(D.sun.set), s.res.moon+" (0 pts)"].forEach(function(x){wx.appendChild(el("span",null,x));}); box.appendChild(wx);
+  var tb=el("table"), body=el("tbody");
+  var base=el("tr");base.appendChild(el("td",null,"Starting score"));base.appendChild(el("td","pts","50"));body.appendChild(base);
+  s.res.factors.forEach(function(x){var tr=el("tr"),td=el("td",null,x.text);td.appendChild(el("span","ev",x.ev));tr.appendChild(td);tr.appendChild(el("td","pts "+(x.pts>0?"c-go":x.pts<0?"c-bad":""),(x.pts>0?"+":"")+x.pts));body.appendChild(tr);});
+  tb.appendChild(body); box.appendChild(tb);
+}
+
+// ---------- sightings ----------
+var LS="sitwindow.sightings", db=null, unsub=null;
+var SEED=[{id:"seed1",at:"2026-11-14T06:45",source:"blind",does:3,bucks:2,notes:"First logged sighting"},{id:"seed2",at:"2026-11-14T13:30",source:"blind",does:0,bucks:1,notes:"Large buck"},{id:"seed3",at:"2026-11-19T03:31",source:"camera",does:2,bucks:0,notes:""}];
+function lsGet(){try{var v=localStorage.getItem(LS);return v?JSON.parse(v):null;}catch(e){return null;}}
+function lsSet(v){try{localStorage.setItem(LS,JSON.stringify(v));}catch(e){}}
+function setSightings(list){sightings=list.slice().sort(function(a,b){return a.at<b.at?1:-1;});renderLog();render();}
+function renderLog(){
+  var L=$("log"); L.textContent="";
+  if(!sightings.length){L.appendChild(el("div","empty","No sightings yet. Log the next deer you see, from the blind or the camera."));return;}
+  sightings.slice(0,30).forEach(function(s){
+    var ms=parseNaive(s.at), d=new Date(ms), row=el("div","entry");
+    var parts=[]; if(+s.does) parts.push(s.does+" doe"+(s.does>1?"s":"")); if(+s.bucks) parts.push(s.bucks+" buck"+(s.bucks>1?"s":"")); if(!parts.length) parts.push("Deer");
+    row.appendChild(el("div","t",DOW[d.getUTCDay()]+" "+MON[d.getUTCMonth()]+" "+d.getUTCDate()+", "+clock(ms)+" · "+parts.join(", ")));
+    row.appendChild(el("div","m",(s.source==="camera"?"Trail camera":"From the blind")+(s.notes?" · "+s.notes:"")));
+    var del=el("button","btn ghost","Delete"); del.type="button"; del.setAttribute("aria-label","Delete sighting");
+    del.addEventListener("click",function(){
+      if(del.dataset.armed!=="1"){del.dataset.armed="1";del.textContent="Sure?";setTimeout(function(){del.dataset.armed="";del.textContent="Delete";},3000);return;}
+      removeSighting(s);
+    });
+    row.appendChild(del); L.appendChild(row);
+  });
+}
+function addSighting(s){
+  if(db){db.collection("sightings").add(s).catch(function(e){$("store").textContent="Couldn't save: "+(e&&e.message||"unknown error")+". Try again.";});}
+  else{s.id="l"+Date.now();var l=(lsGet()||SEED).concat([s]);lsSet(l);setSightings(l);}
+}
+function removeSighting(s){
+  if(db&&s._db){db.collection("sightings").doc(s.id).delete().catch(function(){});}
+  else{var l=(lsGet()||SEED).filter(function(x){return x.id!==s.id;});lsSet(l);setSightings(l);}
+}
+$("logform").addEventListener("submit",function(e){
+  e.preventDefault();
+  var at=$("f-at").value; if(!at) return;
+  addSighting({at:at.slice(0,16),source:$("f-src").value,does:Math.max(0,+$("f-does").value||0),bucks:Math.max(0,+$("f-bucks").value||0),notes:$("f-notes").value.trim(),createdAt:new Date().toISOString()});
+  $("f-does").value=0;$("f-bucks").value=0;$("f-notes").value="";
+});
+$("f-at").value=iso(nowNaive());
+
+setSightings(lsGet()||SEED);
+$("store").textContent="Saved on this phone. Export a backup now and then.";
+$("backup-btns").hidden=false;
+$("b-export").addEventListener("click",function(){
+  var blob=new Blob([JSON.stringify(sightings.map(function(s){return {at:s.at,source:s.source,does:+s.does||0,bucks:+s.bucks||0,notes:s.notes||""};}),null,1)],{type:"application/json"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="sit-window-sightings-"+dayKey(nowNaive())+".json";document.body.appendChild(a);a.click();a.remove();
+});
+$("b-import").addEventListener("change",function(e){
+  var f=e.target.files&&e.target.files[0]; if(!f) return;
+  f.text().then(function(t){
+    var arr=JSON.parse(t); if(!Array.isArray(arr)) throw new Error("not a list");
+    var have={}; (lsGet()||SEED).forEach(function(x){have[x.at+x.source]=x;});
+    arr.forEach(function(x,i){if(x&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(x.at)&&!have[x.at+x.source]){have[x.at+x.source]={id:"i"+Date.now()+i,at:String(x.at).slice(0,16),source:x.source==="camera"?"camera":"blind",does:+x.does||0,bucks:+x.bucks||0,notes:String(x.notes||"").slice(0,140)};}});
+    var l=Object.keys(have).map(function(k){return have[k];}); lsSet(l); setSightings(l);
+    $("store").textContent="Imported. "+l.length+" sightings on this phone.";
+  }).catch(function(){$("store").textContent="That file isn't a Sit Window backup.";});
+  e.target.value="";
+});
+(function connectDb(){
+  if(!window.claude||!window.claude.use) return;
+  window.claude.use("db").then(function(d){
+    if(!d) return; db=d;
+    var timer=setTimeout(function(){$("store").textContent="Sync is slow. Showing sightings saved on this device.";},10000);
+    unsub=db.collection("sightings").orderBy("at","desc").onSnapshot(function(snap){
+      clearTimeout(timer);
+      $("backup-btns").hidden=true;
+      $("store").textContent="Synced to your account, so it's the same on every device.";
+      setSightings(snap.docs.map(function(x){var v=x.data()||{};return {id:x.id,_db:true,at:String(v.at||""),source:v.source,does:v.does,bucks:v.bucks,notes:v.notes||""};}).filter(function(x){return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(x.at);}));
+    },function(){clearTimeout(timer);db=null;$("backup-btns").hidden=false;$("store").textContent="Sync failed. Saving on this device instead.";});
+  }).catch(function(){});
+})();
+
+// ---------- boot ----------
+liveWeather().then(function(w){
+  W=w; $("source").innerHTML="<b>Live forecast</b> from Open-Meteo, updated "+clock(nowNaive())+".";
+  render();
+}).catch(function(){
+  W=sampleWeather(); var b=$("source"); b.className="banner sample";
+  b.innerHTML="<b>Sample weather, not a real forecast.</b> This preview can't reach the weather service, so it uses a made-up week with a cold front to show how scoring works. Sunrise, sunset, rut dates and your sightings are real.";
+  render();
+});
+setInterval(render,10*MIN);
+})();
+</script>
