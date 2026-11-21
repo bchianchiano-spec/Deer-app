@@ -12,4 +12,4 @@ A phone web app that scores every morning, midday, and evening deer-hunting sit 
 - `manifest.webmanifest`, `icon*.png`, `icon.svg`: home-screen install.
 
 ## Add to your home screen
-Open the GitHub Pages link in Safari, tap Share, then tap **Add to Home Screen**.
+Open https://bchianchiano-spec.github.io/Deer-app/ in Safari (capital D, the path is case-sensitive), tap Share, then tap **Add to Home Screen**.
