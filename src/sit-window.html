@@ -59,6 +59,16 @@ section{display:flex;flex-direction:column;gap:12px}
 .cell .l{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .cell.past{opacity:.4}
 .cell.none{cursor:default;color:var(--muted);font-size:.75rem}
+.day .peak{color:var(--accent);font-weight:600}
+.windline{font-size:.84rem}
+.chip.wind{background:transparent;border:1px solid var(--line)}
+.chartwrap{display:flex;flex-direction:column;gap:6px}
+.chart{width:100%;height:auto;display:block}
+.chart .bar{fill:var(--accent);opacity:.45}
+.chart .bar.on{opacity:1}
+.chart .bar.off{fill:var(--skip);opacity:.3}
+.chart .grid-l{stroke:var(--line);stroke-width:1}
+.chart .tick{fill:var(--muted);font-size:10px;font-family:var(--body)}
 .c-go{color:var(--go)}.c-good{color:var(--good)}.c-meh{color:var(--meh)}.c-skip{color:var(--skip)}.c-bad{color:var(--bad)}
 .detail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .detail table{width:100%;border-collapse:collapse;font-size:.86rem}
@@ -101,7 +111,7 @@ details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;
   <section>
     <h2>Best 3 sits this week</h2>
     <div id="picks" class="picks"></div>
-    <div class="note">At most one sit per day, so you don't burn out your own yard. Sits with a north wind never make the list.</div>
+    <div class="note">Ranked by expected deer movement. Your blind's wind only breaks close calls. At most one sit per day, so you don't burn out your own yard.</div>
   </section>
 
   <section>
@@ -131,7 +141,8 @@ details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;
       <li>Every sit starts at 50. Each factor adds or subtracts points, and the detail view shows the math.</li>
       <li><b>Time of day</b> <span class="ev-strong">strong evidence</span>. Dawn and dusk beat everything else. Midday sits only show up during the rut, at a penalty.</li>
       <li><b>Rut timing</b> <span class="ev-strong">strong evidence</span>. In a Mississippi study of 48 collared bucks, they moved about 140 more yards per hour at peak rut. The North Jersey dates here are an estimate: seeking Oct 28 to Nov 9, peak Nov 10 to 22, tail to Dec 5, second rut Dec 6 to 18.</li>
-      <li><b>Wind direction</b> (your blind) <span class="ev-strong">strong</span>. South is best, SE and SW are fine, E and W are iffy, and any north wind is flagged as a bad sit.</li>
+      <li><b>Wind direction</b> is not part of the movement score, because it changes where deer can smell you, not whether they move. It shows as a separate tag for your blind: south is ideal, SE and SW are OK, E and W are iffy, and north is bad. When picking your best 3, it only breaks close calls, worth up to 6 points.</li>
+      <li><b>Hourly chart</b>. Movement peaks around sunrise and sunset and drops midday, with the midday floor rising during the rut. That curve follows GPS-collar studies: Mississippi bucks bedded about 21% of the time within an hour of dawn or dusk, versus 34% across the whole day. Weather and your sightings then raise or lower each hour.</li>
       <li><b>Temperature drop, wind speed</b> <span class="ev-moderate">moderate evidence</span>. Colder than recent days means more daytime movement. High wind means less.</li>
       <li><b>Barometric pressure and rain</b> <span class="ev-weak">weak to moderate evidence</span>. Effects show up mostly at the extremes, like pressure rebounding after a front or rain that just stopped.</li>
       <li><b>Your sightings</b>. Daylight sightings in the last 45 days add up to 8 points to sits at the same time of day. Camera photos at night don't count, because you can't hunt at 2 AM.</li>
@@ -230,17 +241,19 @@ function meanDir(W,ix){var x=0,y=0;ix.forEach(function(i){var r=W.wd[i]*Math.PI/
 function compass(d){return COMPASS[Math.round(d/45)%8];}
 
 function scoreSit(W,sit,sightings){
-  var f=[], ix=hoursIn(W,sit.start,sit.end), bad=false;
+  var f=[], ix=hoursIn(W,sit.start,sit.end);
   if(!ix.length) return null;
-  if(sit.kind==="mid") f.push({pts:-10,text:"Midday: lower odds, but rutting bucks do roam",ev:"strong"});
+  if(sit.kind==="hour"){}
+  else if(sit.kind==="mid") f.push({pts:-10,text:"Midday: lower odds, but rutting bucks do roam",ev:"strong"});
   else f.push({pts:0,text:(sit.kind==="am"?"Dawn":"Dusk")+": peak movement time",ev:"strong"});
   var rp=rutPhase(sit.start); if(rp.pts) f.push({pts:rp.pts,text:rp.label,ev:"strong"});
 
-  var wd=meanDir(W,ix), c=compass(wd), ws=avg(W,"ws",ix);
-  if(c==="S") f.push({pts:8,text:"South wind, ideal for your blind",ev:"strong"});
-  else if(c==="SE"||c==="SW") f.push({pts:4,text:c+" wind, workable for your blind",ev:"strong"});
-  else if(c==="E"||c==="W") f.push({pts:-6,text:c+" wind, iffy for your blind",ev:"strong"});
-  else {bad=true; f.push({pts:-25,text:c+" wind blows your scent toward the deer",ev:"strong"});}
+  var wd=meanDir(W,ix), c=compass(wd), ws=avg(W,"ws",ix), wind;
+  // Wind direction only matters for Ben's blind, not for whether deer move. Kept separate from the score.
+  if(c==="S") wind={rank:2,cls:"c-go",label:"ideal",text:"South wind, ideal for your blind"};
+  else if(c==="SE"||c==="SW") wind={rank:1,cls:"c-good",label:"OK",text:c+" wind, workable for your blind"};
+  else if(c==="E"||c==="W") wind={rank:-1,cls:"c-meh",label:"iffy",text:c+" wind, iffy for your blind"};
+  else wind={rank:-4,cls:"c-bad",label:"bad",text:c+" wind carries your scent toward the deer"};
 
   if(ws<=10) f.push({pts:3,text:"Light wind ("+Math.round(ws)+" mph)",ev:"moderate"});
   else if(ws<=15) f.push({pts:-3,text:"Breezy ("+Math.round(ws)+" mph)",ev:"moderate"});
@@ -280,14 +293,30 @@ function scoreSit(W,sit,sightings){
   if(n) f.push({pts:Math.min(8,3*n+b),text:"You logged deer at this time of day ("+n+" sighting"+(n>1?"s":"")+(b?", "+b+" buck"+(b>1?"s":""):"")+")",ev:"your log"});
 
   var total=Math.max(0,Math.min(100,50+f.reduce(function(a,x){return a+x.pts;},0)));
-  return {score:Math.round(total),bad:bad,factors:f,wx:{temp:t,ws:ws,dir:c,rain:rain,pres:W.pres[i0]},moon:moonPhase(sit.start)};
+  return {score:Math.round(total),wind:wind,factors:f,wx:{temp:t,ws:ws,dir:c,rain:rain,pres:W.pres[i0]},moon:moonPhase(sit.start)};
 }
 function rating(r){
-  if(r.bad) return {cls:"c-bad",label:"Bad wind"};
   if(r.score>=75) return {cls:"c-go",label:"Go"};
   if(r.score>=60) return {cls:"c-good",label:"Good"};
   if(r.score>=45) return {cls:"c-meh",label:"Meh"};
   return {cls:"c-skip",label:"Skip"};
+}
+// Expected deer movement by hour, 0..1: peaks around sunrise and sunset, a midday floor that rises during the rut.
+function movementCurve(ms,sun){
+  var g=function(x,mu,sd){var z=(x-mu)/sd;return Math.exp(-0.5*z*z);};
+  var peak=Math.max(g(ms,sun.rise+15*MIN,72*MIN),g(ms,sun.set-15*MIN,72*MIN));
+  var rp=rutPhase(ms).pts, base=0.45+(rp>=8?0.12:rp>=4?0.06:0);
+  return base+(1-base)*peak;
+}
+function hourlyMovement(W,D){
+  var out=[], a=Math.floor((D.sun.rise-90*MIN)/HOUR)*HOUR, b=Math.ceil((D.sun.set+90*MIN)/HOUR)*HOUR;
+  for(var ms=a;ms<b;ms+=HOUR){
+    var r=scoreSit(W,{kind:"hour",start:ms,end:ms+HOUR},sightings), mid=ms+30*MIN;
+    if(!r) continue;
+    var v=Math.max(0,Math.min(100,Math.round(15+movementCurve(mid,D.sun)*55+(r.score-50))));
+    out.push({t:ms,v:v,legal:mid>=D.sun.rise-30*MIN&&mid<=D.sun.set+30*MIN});
+  }
+  return out;
 }
 function buildSits(W){
   var today=Math.floor(nowNaive()/DAY)*DAY, days=[];
@@ -314,13 +343,13 @@ function render(){
   var days=buildSits(W), all=[];
   days.forEach(function(D){["am","mid","pm"].forEach(function(k){var s=D.sits[k];if(!s)return;s.res=scoreSit(W,s,sightings);s.day=D.day;if(s.res)all.push(s);});});
 
-  // best 3: future, not bad wind, one per day
-  var cand=all.filter(function(s){return s.start+30*MIN>now&&!s.res.bad;}).sort(function(a,b){return b.res.score-a.res.score;});
+  // best 3: ranked by deer movement; blind wind only nudges close calls. One per day.
+  var cand=all.filter(function(s){return s.start+30*MIN>now;}).sort(function(a,b){return (b.res.score+b.res.wind.rank)-(a.res.score+a.res.wind.rank);});
   var used={}, picks=[];
   cand.forEach(function(s){if(picks.length<3&&!used[s.day]){used[s.day]=1;picks.push(s);}});
   picks.sort(function(a,b){return a.start-b.start;});
   var P=$("picks"); P.textContent="";
-  if(!picks.length) P.appendChild(el("div","empty","No workable sits in the next 7 days. North wind all week. Clean your bow."));
+  if(!picks.length) P.appendChild(el("div","empty","No sits left in the forecast window."));
   picks.forEach(function(s){
     var r=rating(s.res), card=el("div","pick");
     var sc=el("div","score "+r.cls,String(s.res.score)); card.appendChild(sc);
@@ -328,6 +357,7 @@ function render(){
     card.appendChild(el("div","times",clock(s.start)+" to "+clock(s.end)+" · "+Math.round(s.res.wx.temp)+"°F, "+s.res.wx.dir+" "+Math.round(s.res.wx.ws)+" mph"));
     var ch=el("div","chips");
     s.res.factors.filter(function(x){return x.pts!==0;}).sort(function(a,b){return Math.abs(b.pts)-Math.abs(a.pts);}).slice(0,4).forEach(function(x){ch.appendChild(el("span","chip "+(x.pts>0?"pos":"neg"),x.text));});
+    ch.appendChild(el("span","chip wind "+s.res.wind.cls,"Blind wind: "+s.res.wind.text.replace(" for your blind","")));
     card.appendChild(ch); P.appendChild(card);
   });
 
@@ -335,14 +365,18 @@ function render(){
   var head=el("div","row head");head.setAttribute("role","row");["Day","Morning","Midday","Evening"].forEach(function(h){head.appendChild(el("div",null,h));});G.appendChild(head);
   days.forEach(function(D){
     var row=el("div","row");row.setAttribute("role","row");
-    var dc=el("div","day",dayName(D.day,true));dc.appendChild(el("small",null,MON[new Date(D.day).getUTCMonth()]+" "+new Date(D.day).getUTCDate()));row.appendChild(dc);
+    var dc=el("div","day",dayName(D.day,true));dc.appendChild(el("small",null,MON[new Date(D.day).getUTCMonth()]+" "+new Date(D.day).getUTCDate()));
+    D.hours=hourlyMovement(W,D);
+    var best=D.hours.filter(function(x){return x.legal;}).sort(function(a,b){return b.v-a.v;})[0];
+    if(best) dc.appendChild(el("small","peak","Peak "+clock(best.t).replace(":00","")));
+    row.appendChild(dc);
     ["am","mid","pm"].forEach(function(k){
       var s=D.sits[k];
       if(!s||!s.res){var n=el("div","cell none",s?"no data":"—");row.appendChild(n);return;}
       var r=rating(s.res), b=el("button","cell"+(s.end<now?" past":""));
       b.type="button"; var id=dayKey(D.day)+k; b.setAttribute("aria-pressed",String(selected===id));
-      b.setAttribute("aria-label",dayName(D.day)+" "+KIND[k]+": score "+s.res.score+", "+r.label);
-      b.appendChild(el("span","n "+r.cls,String(s.res.score))); b.appendChild(el("span","l",r.label));
+      b.setAttribute("aria-label",dayName(D.day)+" "+KIND[k]+": movement score "+s.res.score+", "+r.label+", "+s.res.wx.dir+" wind "+s.res.wind.label+" for the blind");
+      b.appendChild(el("span","n "+r.cls,String(s.res.score))); b.appendChild(el("span","l "+s.res.wind.cls,s.res.wx.dir+" "+s.res.wind.label));
       b.addEventListener("click",function(){selected=(selected===id)?null:id;render();});
       row.appendChild(b);
       if(selected===id) showDetail(D,s);
@@ -357,11 +391,31 @@ function showDetail(D,s){
   var h=el("div",null); var t=el("strong",null,dayName(D.day)+" · "+KIND[s.kind]+" · ");
   h.appendChild(t); h.appendChild(el("strong",r.cls,s.res.score+" ("+r.label+")")); box.appendChild(h);
   box.appendChild(el("div","wx",clock(s.start)+" to "+clock(s.end)));
+  box.appendChild(el("div","windline "+s.res.wind.cls,"Blind wind: "+s.res.wind.text+". This doesn't change the movement score; it only breaks ties when picking your best 3."));
+  box.appendChild(chart(D,s));
   var wx=el("div","wx"); [Math.round(s.res.wx.temp)+"°F", s.res.wx.dir+" "+Math.round(s.res.wx.ws)+" mph", s.res.wx.pres.toFixed(0)+" hPa", s.res.wx.rain.toFixed(1)+" mm rain", "Sunrise "+clock(D.sun.rise), "Sunset "+clock(D.sun.set), s.res.moon+" (0 pts)"].forEach(function(x){wx.appendChild(el("span",null,x));}); box.appendChild(wx);
   var tb=el("table"), body=el("tbody");
   var base=el("tr");base.appendChild(el("td",null,"Starting score"));base.appendChild(el("td","pts","50"));body.appendChild(base);
   s.res.factors.forEach(function(x){var tr=el("tr"),td=el("td",null,x.text);td.appendChild(el("span","ev",x.ev));tr.appendChild(td);tr.appendChild(el("td","pts "+(x.pts>0?"c-go":x.pts<0?"c-bad":""),(x.pts>0?"+":"")+x.pts));body.appendChild(tr);});
   tb.appendChild(body); box.appendChild(tb);
+}
+
+function chart(D,s){
+  var hrs=D.hours||hourlyMovement(W,D), n=hrs.length, Wd=320, H=110, top=8, bot=22, bw=Wd/n;
+  var NS="http://www.w3.org/2000/svg", svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox","0 0 "+Wd+" "+H); svg.setAttribute("class","chart"); svg.setAttribute("role","img");
+  var best=hrs.filter(function(x){return x.legal;}).sort(function(a,b){return b.v-a.v;})[0];
+  svg.setAttribute("aria-label","Expected deer movement by hour. Peak around "+(best?clock(best.t):"n/a"));
+  function mk(tag,at){var e=document.createElementNS(NS,tag);for(var k in at)e.setAttribute(k,at[k]);svg.appendChild(e);return e;}
+  [50,100].forEach(function(g){var y=top+(H-top-bot)*(1-g/100);mk("line",{x1:0,x2:Wd,y1:y,y2:y,"class":"grid-l"});});
+  hrs.forEach(function(x,i){
+    var h=(H-top-bot)*x.v/100, inSit=x.t+30*MIN>s.start&&x.t+30*MIN<s.end;
+    var r=mk("rect",{x:i*bw+1.5,y:top+(H-top-bot)-h,width:Math.max(1,bw-3),height:h,rx:2,"class":"bar"+(inSit?" on":"")+(x.legal?"":" off")});
+    var tt=document.createElementNS(NS,"title");tt.textContent=clock(x.t)+": "+x.v;r.appendChild(tt);
+    if(i%3===0){var t=mk("text",{x:i*bw+bw/2,y:H-6,"text-anchor":"middle","class":"tick"});t.textContent=clock(x.t).replace(":00","").replace(" AM","a").replace(" PM","p");}
+  });
+  var wrap=el("div","chartwrap"); wrap.appendChild(el("div","ev","Expected deer movement by hour (highlighted: this sit; faded: outside legal hours)"));
+  wrap.appendChild(svg); return wrap;
 }
 
 // ---------- sightings ----------
